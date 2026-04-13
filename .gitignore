@@ -205,3 +205,12 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Frontend
+node_modules/
+dist/
+build/
+.DS_Store
+
+# AI App
+ai_log/
