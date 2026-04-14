@@ -29,7 +29,6 @@ function App() {
                 projectionConfig={{
                     rotate: [0, 0, 0],
                     center: [0, 20],
-                    // scale: 147
                     scale: 120
                 }}
                 className="w-full h-full max-w-6xl"
@@ -47,7 +46,7 @@ function App() {
                                 strokeWidth={0.5}
                                 style={{
                                     default: { outline: "none" },
-                                    hover: { fill: "#3b82f6", outline: "none" },
+                                    // hover: { fill: "#3b82f6", outline: "none" },
                                     pressed: { fill: "#2563eb", outline: "none" }
                                 }}
                             />
