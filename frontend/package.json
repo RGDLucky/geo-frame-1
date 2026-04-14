@@ -9,9 +9,14 @@
   },
   "dependencies": {
     "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "react-dom": "^18.2.0",
+    "react-simple-maps": "^3.0.0",
+    "d3-scale": "^4.0.2",
+    "d3-dsv": "^3.0.1"
   },
   "devDependencies": {
+    "@types/d3-scale": "^4.0.8",
+    "@types/d3-dsv": "^3.0.5",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
     "@vitejs/plugin-react": "^4.2.0",

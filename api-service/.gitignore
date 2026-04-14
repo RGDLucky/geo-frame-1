@@ -1,0 +1,5 @@
+node_modules/
+dist/
+
+# Data files (coordinate data specific to each environment)
+src/data/coordinates.json
