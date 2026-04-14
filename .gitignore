@@ -212,5 +212,13 @@ dist/
 build/
 .DS_Store
 
-# AI App
+# API Service
+api-service/node_modules/
+api-service/dist/
+
+# Model Service
+model-service/.venv/
+model-service/__pycache__/
+
+# AI Log
 ai_log/

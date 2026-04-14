@@ -1,22 +1,39 @@
-version: '3.8'
-
 services:
-  frontend:
-    build: ./frontend
-    ports:
-      - "3000:3000"
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-    command: npm run dev
-
-  backend:
-    build: ./backend
+  api-service:
+    build: ./api-service
     ports:
       - "8000:8000"
     volumes:
-      - ./backend:/app
+      - ./api-service:/app
+      - ./frontend:/app/frontend
+      - /app/node_modules
+    env_file:
+      - ./api-service/.env
+    command: npm run dev
+    depends_on:
+      - model-service
+
+  model-service:
+    build: ./model-service
+    ports:
+      - "50051:50051"
+    volumes:
+      - ./model-service:/app
       - /app/.venv
     env_file:
-      - ./backend/.env
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+      - ./model-service/.env
+    command: python -m app.main
+
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: geo_int
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:

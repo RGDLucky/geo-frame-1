@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package geo_int;
+
+service ModelService {
+  rpc ProcessRequest(Request) returns (Response);
+  rpc HealthCheck(Empty) returns (HealthResponse);
+}
+
+message Empty {}
+
+message Request {
+  string input = 1;
+  map<string, string> metadata = 2;
+}
+
+message Response {
+  string result = 1;
+  bool success = 2;
+  string error = 3;
+  map<string, string> metadata = 4;
+}
+
+message HealthResponse {
+  string status = 1;
+}
