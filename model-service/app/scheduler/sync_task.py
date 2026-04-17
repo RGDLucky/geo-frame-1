@@ -3,7 +3,7 @@ import uuid
 from datetime import datetime
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from app.config import settings
-from app.clients.external_api import get_external_api_client
+from app.clients import get_s3_client
 from app.processors.ai_processor import get_ai_processor
 from app.storage.database import database
 
@@ -11,7 +11,7 @@ from app.storage.database import database
 class SyncScheduler:
     def __init__(self):
         self.scheduler = AsyncIOScheduler()
-        self.api_client = get_external_api_client()
+        self.s3_client = get_s3_client()
         self.ai_processor = get_ai_processor()
         self._last_sync_status = "never_run"
         self._last_sync_time = None
@@ -23,7 +23,7 @@ class SyncScheduler:
 
         for attempt in range(max_retries + 1):
             try:
-                raw_data = await self.api_client.fetch()
+                raw_data = await self.s3_client.fetch()
                 await database.store_raw(sync_id, raw_data)
 
                 processed_data = await self.ai_processor.process(raw_data)

@@ -17,6 +17,10 @@ class Settings(BaseSettings):
     external_api_key: str = ""
     ai_model_type: str = ""
 
+    s3_bucket_name: str = ""
+    s3_region: str = "us-east-1"
+    s3_file_prefix: str = ""
+
     class Config:
         env_file = ".env"
 
