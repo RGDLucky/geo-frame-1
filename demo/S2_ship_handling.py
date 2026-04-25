@@ -1,17 +1,14 @@
-import json
 import os
 
 import geopandas as gpd
 import numpy as np
 import rasterio
+import settings
 from rasterio.mask import mask
-from rasterio.transform import Affine
 
 
-# Helper to read a single-band raster and mask it
 def read_and_mask(band_path, geoms_json, shape_box):
     with rasterio.open(band_path) as src:
-        # If shapefile CRS differs from raster CRS, reproject geometries
         if (
             shape_box.crs is not None
             and src.crs is not None
@@ -32,27 +29,26 @@ def read_and_mask(band_path, geoms_json, shape_box):
                 "count": 1,
             }
         )
-        return data[0], profile  # single-band array and profile
+        return data[0], profile
 
 
-def roi_cut_stack(in_blue, in_green, in_red, rio_box):
-    shape_box = gpd.read_file(rio_box)
+def roi_cut_stack(in_blue, in_green, in_red, roi_box=None, output_dir=None):
+    roi_box = roi_box or os.path.join(settings.ASSETS_PATH, settings.ROI_BOX)
+    output_dir = output_dir or settings.OUTPUT_PATH
+
+    shape_box = gpd.read_file(roi_box)
     geoms = shape_box.geometry.values
     geoms_json = [g.__geo_interface__ for g in geoms]
 
-    # Read & mask each band
     b_band, profile = read_and_mask(in_blue, geoms_json, shape_box)
     g_band, _ = read_and_mask(in_green, geoms_json, shape_box)
     r_band, _ = read_and_mask(in_red, geoms_json, shape_box)
 
-    # Stack bands into (count, height, width)
     rgb = np.stack([b_band, g_band, r_band], axis=0)
 
-    # Update profile for 3-band output
     profile.update({"count": 3, "dtype": rgb.dtype})
 
-    # Write output (GeoTIFF)
-    out_tmp_3b_roi = output_path + "/" + roi_3b_image
+    out_tmp_3b_roi = os.path.join(output_dir, settings.ROI_3B_IMAGE)
     with rasterio.open(out_tmp_3b_roi, "w", **profile) as dst:
         dst.write(rgb)
 
@@ -60,45 +56,42 @@ def roi_cut_stack(in_blue, in_green, in_red, rio_box):
     return out_tmp_3b_roi
 
 
-def image_tiler(out_tmp_3b_roi, docks_shp, chips_path, date_stamp):
-    id_field = "id"  # shapefile ID field name
-    id_values = []  # list of IDs to export; empty = export all
+def image_tiler(out_tmp_3b_roi, docks_shp=None, chips_dir=None, date_stamp=None):
+    docks_shp = docks_shp or os.path.join(settings.ASSETS_PATH, settings.DOCKS_SHP)
+    chips_dir = chips_dir or os.path.join(
+        settings.OUTPUT_PATH, settings.DATE_STAMP, "chips"
+    )
+    date_stamp = date_stamp or settings.DATE_STAMP
+
+    id_field = "id"
     all_touched = True
     driver = "GTiff"
-    dtype_override = None  # e.g., 'uint8' or None
-    filename_template = "{attr_name}_{date_stamp}.tif"  # use attribute placeholders
 
-    os.makedirs(chips_path, exist_ok=True)
+    os.makedirs(chips_dir, exist_ok=True)
 
-    # Read shapefile
     gdf = gpd.read_file(docks_shp)
 
-    # Filter by id_values if provided
-    sel = gdf[gdf[id_field].isin(id_values)] if id_values else gdf
+    sel = gdf
     if sel.empty:
         raise SystemExit("No matching features found")
 
     with rasterio.open(out_tmp_3b_roi) as src:
         src_crs = src.crs
-        # Reproject selected geometries to raster CRS if needed
         if sel.crs is not None and src_crs is not None and sel.crs != src_crs:
             sel = sel.to_crs(src_crs)
 
         for _, row in sel.iterrows():
             id_val = row[id_field]
-            # Example attribute to include in filename (change as needed)
-            terminal = str(row.get("Terminal")).replace(" ", "_")  # safe fallback
-            pier = str(row.get("Pier")).replace(" ", "_")  # safe fallback
-            dock = str(row.get("Dock")).replace(" ", "_")  # safe fallback
+            terminal = str(row.get("Terminal")).replace(" ", "_")
+            pier = str(row.get("Pier")).replace(" ", "_")
+            dock = str(row.get("Dock")).replace(" ", "_")
             attr_name = terminal + "_" + pier + "_" + dock
             geom = [row.geometry.__geo_interface__]
 
-            # Mask to geometry
             out_image, out_transform = mask(
                 src, geom, crop=True, all_touched=all_touched
             )
 
-            # Prepare metadata
             out_meta = src.meta.copy()
             out_meta.update(
                 {
@@ -109,61 +102,13 @@ def image_tiler(out_tmp_3b_roi, docks_shp, chips_path, date_stamp):
                     "count": out_image.shape[0],
                 }
             )
-            if dtype_override:
-                out_meta["dtype"] = dtype_override
-                out_image = out_image.astype(dtype_override)
 
-            # Build filename and write raster
-            fname = filename_template.format(attr_name=attr_name, date_stamp=date_stamp)
-            out_path = os.path.join(chips_path, fname)
+            fname = settings.FILENAME_TEMPLATE.format(
+                attr_name=attr_name, date_stamp=date_stamp
+            )
+            out_path = os.path.join(chips_dir, fname)
             with rasterio.open(out_path, "w", **out_meta) as dst:
                 dst.write(out_image)
 
             print(f"Wrote chip {out_path}")
 
-
-######################
-# Code completed
-######################
-# Cut 3 bands to Region of Interest Envelope
-# Stack 3 bands
-# cycle through Dock ID
-# Select dock by "ID" and clip stacked 3 band image
-# form output image filename
-# output image chip for use within model
-######################
-
-if __name__ == "__main__":
-    # set target date; generated by system time
-    date_stamp = "20260413"
-
-    # set input data file path; will be S3 bucket in future
-    input_path = "./s3_temp"
-
-    # set output data file path; to be determined
-    output_path = "./output"
-    chips_path = output_path + "/" + date_stamp + "/chips"
-
-    # set output temp 3b region of interest image; to be determined
-    roi_3b_image = "tmp_roi_3b_image.tif"
-    out_tmp_3b_roi = (
-        output_path + "/" + roi_3b_image
-    )  # temp 3b roi image and path; to be determined
-
-    # set region of interest shapefile to use; This is fixed for project
-    roi_box = "./assets/ROI_box.shp"
-
-    # set shapefile of target docks; This is fixed for project
-    docks_shp = "./assets/RasTanura Oil Terminal.shp"
-
-    # set input individual band images to use; Names will be adjusted based on S3 data store
-    in_blue = input_path + "/T39RVK_20260413T070731_B03_10m.jp2"
-    in_green = input_path + "/T39RVK_20260413T070731_B04_10m.jp2"
-    in_red = input_path + "/T39RVK_20260413T070731_B08_10m.jp2"
-
-    # begin data processing steps:
-    # collect bands and cut to ROI
-    roi_cut_stack(in_blue, in_green, in_red, roi_box)
-
-    # cut tmp 3b image into dock-specific image chips for model analysis
-    image_tiler(out_tmp_3b_roi, docks_shp, chips_path, date_stamp)
