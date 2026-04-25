@@ -222,3 +222,7 @@ model-service/__pycache__/
 
 # AI Log
 ai_log/
+
+# Demo
+demo/output/
+demo/s3_temp/
