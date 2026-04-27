@@ -1,0 +1,9 @@
+*.pth
+*.pt
+*.bin
+checkpoints/
+runs/
+.hf_cache/
+__pycache__/
+*.pyc
+.env

@@ -1,0 +1,14 @@
+train:
+  lr: 0.001
+  batch_size: 64
+  epochs: 10
+  seed: 42
+data:
+  dataset: cifar10
+  data_dir: ./data
+  num_workers: 2
+model:
+  num_classes: 10
+  input_channels: 3
+hf:
+  repo_id: null
