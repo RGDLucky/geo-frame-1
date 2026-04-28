@@ -1,10 +1,12 @@
 import os
+import glob
 
 import geopandas as gpd
 import numpy as np
 import rasterio
-import settings
+from PIL import Image
 from rasterio.mask import mask
+import settings
 
 
 def read_and_mask(band_path, geoms_json, shape_box):
@@ -44,7 +46,8 @@ def roi_cut_stack(in_blue, in_green, in_red, roi_box=None, output_dir=None):
     g_band, _ = read_and_mask(in_green, geoms_json, shape_box)
     r_band, _ = read_and_mask(in_red, geoms_json, shape_box)
 
-    rgb = np.stack([b_band, g_band, r_band], axis=0)
+    # RGB order for correct color representation
+    rgb = np.stack([r_band, g_band, b_band], axis=0)
 
     profile.update({"count": 3, "dtype": rgb.dtype})
 
@@ -112,3 +115,34 @@ def image_tiler(out_tmp_3b_roi, docks_shp=None, chips_dir=None, date_stamp=None)
 
             print(f"Wrote chip {out_path}")
 
+    return chips_dir
+
+
+def convert_chips_to_png(output_dir=None):
+    """Convert GeoTIFF chips to PNG for ML pipeline with proper 16-bit to 8-bit scaling"""
+    output_dir = output_dir or settings.OUTPUT_PATH
+    chips_dir = os.path.join(output_dir, settings.DATE_STAMP, "chips")
+    png_dir = os.path.join(output_dir, "png_chips")
+    os.makedirs(png_dir, exist_ok=True)
+
+    tif_files = glob.glob(os.path.join(chips_dir, "*.tif"))
+    if not tif_files:
+        print(f"No TIF files found in {chips_dir}")
+        return png_dir
+
+    for tif_file in tif_files:
+        with rasterio.open(tif_file) as src:
+            img_data = src.read([1, 2, 3])  # Read RGB bands
+            img_data = np.transpose(img_data, (1, 2, 0))  # (H, W, C)
+
+            # Scale from 16-bit to 8-bit if needed
+            if img_data.dtype == np.uint16:
+                img_data = (img_data / 65535.0 * 255).astype(np.uint8)
+
+            img = Image.fromarray(img_data)
+            png_path = os.path.join(png_dir, os.path.splitext(os.path.basename(tif_file))[0] + ".png")
+            img.save(png_path)
+            print(f"Converted: {png_path}")
+
+    print(f"Total {len(tif_files)} chips converted to PNG in {png_dir}")
+    return png_dir

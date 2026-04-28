@@ -229,3 +229,8 @@ demo/s3_temp/
 
 # ML
 ml/data/
+
+# Demo
+demo/myenv/
+demo/s3_temp/
+demo/output/

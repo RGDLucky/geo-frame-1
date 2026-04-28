@@ -1,13 +1,23 @@
 import os
 from datetime import date
 
+# Hardcoded location parameters (Ras Tanura Oil Terminal area)
+UTM_ZONE = "39"
+LATITUDE_BAND = "R"
+GRID_SQUARE = "VK"
+SEQUENCE = "0"
+
 S3_BUCKET = os.getenv("S3_BUCKET", "sentinel-s2-l2a")
-S3_PREFIX = os.getenv("S3_PREFIX", "tiles/39/R/VK/{year}/{month}/{day}/0")
+S3_PREFIX = f"tiles/{UTM_ZONE}/{LATITUDE_BAND}/{GRID_SQUARE}/{{year}}/{{month}}/{{day}}/{SEQUENCE}/R10m"
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 INPUT_PATH = os.path.join(BASE_DIR, os.getenv("INPUT_DIR", "s3_temp"))
 OUTPUT_PATH = os.path.join(BASE_DIR, os.getenv("OUTPUT_DIR", "output"))
 ASSETS_PATH = os.path.join(BASE_DIR, "assets")
+
+# ML pipeline paths
+ML_OUTPUT_DIR = os.path.join(BASE_DIR, "../ml/data/unlabeled")
+PNG_CHIPS_DIR = os.path.join(OUTPUT_PATH, "png_chips")
 
 ROI_BOX = "ROI_box.shp"
 DOCKS_SHP = "RasTanura Oil Terminal.shp"

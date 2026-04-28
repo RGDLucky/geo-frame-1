@@ -17,10 +17,6 @@ def list_s3_tiles():
         day=today.day,
     )
 
-    # TODO: DELETE this prefix
-    # prefix = "tiles/39/R/VK/2026/4/18/0/R10m"
-    prefix = "tiles/39/R/VK/2026/4/13/0/R10m"
-
     response = s3.list_objects_v2(
         Bucket=settings.S3_BUCKET,
         Prefix=prefix,
@@ -34,9 +30,9 @@ def download_bands(objects, local_dir):
     os.makedirs(local_dir, exist_ok=True)
 
     band_map = {
-        "B03": "blue",
-        "B04": "green",
-        "B08": "red",
+        "B02": "blue",
+        "B03": "green",
+        "B04": "red",
     }
 
     local_files = {}
@@ -86,6 +82,10 @@ def main():
 
     print("Tiling to dock chips...")
     S2_ship_handling.image_tiler(roi_image)
+
+    print("Converting chips to PNG for ML...")
+    png_dir = S2_ship_handling.convert_chips_to_png(settings.OUTPUT_PATH)
+    print(f"PNG chips saved to: {png_dir}")
 
     print("Done!")
 
