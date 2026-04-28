@@ -1,24 +1,34 @@
+import torch
 import torch.nn as nn
+import torchvision.models as models
 
-class CNN(nn.Module):
-    def __init__(self, input_channels=3, num_classes=10):
+
+class DockClassifier(nn.Module):
+    def __init__(self, num_classes=3, pretrained=True, dropout=0.3):
         super().__init__()
-        self.features = nn.Sequential(
-            nn.Conv2d(input_channels, 16, kernel_size=3, padding=1),
-            nn.ReLU(),
-            nn.MaxPool2d(2, 2),
-            nn.Conv2d(16, 32, kernel_size=3, padding=1),
-            nn.ReLU(),
-            nn.MaxPool2d(2, 2),
-        )
-        self.classifier = nn.Sequential(
-            nn.Flatten(),
-            nn.Linear(32 * 8 * 8, 128),
-            nn.ReLU(),
-            nn.Linear(128, num_classes),
-        )
+        self.backbone = models.efficientnet_b2(pretrained=pretrained)
+        in_features = self.backbone.classifier[1].in_features
+        self.backbone.classifier = nn.Identity()
+        self.global_pool = nn.AdaptiveAvgPool2d(1)
+        self.dropout1 = nn.Dropout(dropout)
+        self.bn = nn.BatchNorm1d(in_features)
+        self.fc1 = nn.Linear(in_features, 512)
+        self.relu = nn.ReLU()
+        self.dropout2 = nn.Dropout(0.2)
+        self.fc2 = nn.Linear(512, num_classes)
 
     def forward(self, x):
-        x = self.features(x)
-        x = self.classifier(x)
+        x = self.backbone.features(x)
+        x = self.global_pool(x)
+        x = torch.flatten(x, 1)
+        x = self.dropout1(x)
+        x = self.bn(x)
+        x = self.fc1(x)
+        x = self.relu(x)
+        x = self.dropout2(x)
+        x = self.fc2(x)
         return x
+
+
+def get_model(num_classes=3, pretrained=True):
+    return DockClassifier(num_classes=num_classes, pretrained=pretrained)

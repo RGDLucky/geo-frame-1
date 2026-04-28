@@ -226,3 +226,6 @@ ai_log/
 # Demo
 demo/output/
 demo/s3_temp/
+
+# ML
+ml/data/

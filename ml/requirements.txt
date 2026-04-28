@@ -1,5 +1,10 @@
 torch
 torchvision
-huggingface-hub
+glymur
+opencv-python
+Pillow
 pyyaml
 tqdm
+scikit-learn
+pandas
+huggingface-hub
