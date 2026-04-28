@@ -61,10 +61,11 @@ def roi_cut_stack(in_blue, in_green, in_red, roi_box=None, output_dir=None):
 
 def image_tiler(out_tmp_3b_roi, docks_shp=None, chips_dir=None, date_stamp=None):
     docks_shp = docks_shp or os.path.join(settings.ASSETS_PATH, settings.DOCKS_SHP)
-    chips_dir = chips_dir or os.path.join(
-        settings.OUTPUT_PATH, settings.DATE_STAMP, "chips"
-    )
     date_stamp = date_stamp or settings.DATE_STAMP
+
+    # Default chips_dir uses DATE_STAMP
+    if chips_dir is None:
+        chips_dir = os.path.join(settings.OUTPUT_PATH, date_stamp, "chips")
 
     id_field = "id"
     all_touched = True
@@ -118,10 +119,12 @@ def image_tiler(out_tmp_3b_roi, docks_shp=None, chips_dir=None, date_stamp=None)
     return chips_dir
 
 
-def convert_chips_to_png(output_dir=None):
+def convert_chips_to_png(output_dir=None, date_stamp=None):
     """Convert GeoTIFF chips to PNG for ML pipeline with proper 16-bit to 8-bit scaling"""
     output_dir = output_dir or settings.OUTPUT_PATH
-    chips_dir = os.path.join(output_dir, settings.DATE_STAMP, "chips")
+    date_stamp = date_stamp or settings.DATE_STAMP
+
+    chips_dir = os.path.join(output_dir, "chips")
     png_dir = os.path.join(output_dir, "png_chips")
     os.makedirs(png_dir, exist_ok=True)
 
