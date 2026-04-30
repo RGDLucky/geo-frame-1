@@ -1,12 +1,12 @@
-import os
 import glob
+import os
 
 import geopandas as gpd
 import numpy as np
 import rasterio
+import settings
 from PIL import Image
 from rasterio.mask import mask
-import settings
 
 
 def read_and_mask(band_path, geoms_json, shape_box):
@@ -37,6 +37,7 @@ def read_and_mask(band_path, geoms_json, shape_box):
 def roi_cut_stack(in_blue, in_green, in_red, roi_box=None, output_dir=None):
     roi_box = roi_box or os.path.join(settings.ASSETS_PATH, settings.ROI_BOX)
     output_dir = output_dir or settings.OUTPUT_PATH
+    os.makedirs(output_dir, exist_ok=True)
 
     shape_box = gpd.read_file(roi_box)
     geoms = shape_box.geometry.values
@@ -143,7 +144,9 @@ def convert_chips_to_png(output_dir=None, date_stamp=None):
                 img_data = (img_data / 65535.0 * 255).astype(np.uint8)
 
             img = Image.fromarray(img_data)
-            png_path = os.path.join(png_dir, os.path.splitext(os.path.basename(tif_file))[0] + ".png")
+            png_path = os.path.join(
+                png_dir, os.path.splitext(os.path.basename(tif_file))[0] + ".png"
+            )
             img.save(png_path)
             print(f"Converted: {png_path}")
 

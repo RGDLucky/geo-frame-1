@@ -33,7 +33,7 @@ def download_bands(objects, local_dir):
     band_map = {
         "B02": "blue",
         "B03": "green",
-        "B04": "red",
+        "B08": "red",
     }
 
     local_files = {}
@@ -94,14 +94,12 @@ def process_date(target_date):
 
     print("Tiling to dock chips...")
     chips_dir = S2_ship_handling.image_tiler(
-        roi_image,
-        chips_dir=os.path.join(date_output_dir, "chips")
+        roi_image, chips_dir=os.path.join(date_output_dir, "chips")
     )
 
     print("Converting chips to PNG for ML...")
     png_dir = S2_ship_handling.convert_chips_to_png(
-        output_dir=date_output_dir,
-        date_stamp=date_stamp
+        output_dir=date_output_dir, date_stamp=date_stamp
     )
     print(f"PNG chips saved to: {png_dir}")
 
@@ -114,7 +112,8 @@ def main():
 
     # Process past 2 years (730 days)
     end_date = date.today()
-    start_date = end_date - timedelta(days=730)
+    # start_date = end_date - timedelta(days=730)
+    start_date = end_date - timedelta(days=30)
 
     print(f"Processing data from {start_date} to {end_date} (past 2 years)")
 
