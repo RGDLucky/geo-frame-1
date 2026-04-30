@@ -2,7 +2,7 @@
 Dock Boat Image Labeler GUI
 
 Usage:
-    python label_gui.py [unlabeled_images_directory]
+    python label_gui.py [parent_directory]
 
 Description:
     A Tkinter-based tool to label unlabeled dock satellite images into 3 classes:
@@ -14,19 +14,22 @@ Description:
     appended to ml/data/dataset.csv in the format:
     image_path, label, split, is_synthetic
 
+    The tool processes all subdirectories within the provided parent directory.
+    For each subdirectory, it looks for a 'png_chips' folder and loads all .png
+    images from within that folder for labeling.
+
 Controls:
     - Keyboard: 1 (No Boat), 2 (Boat), 3 (Too Cloudy), Ctrl+Z (Undo last label)
     - GUI Buttons: Click the corresponding class button or "Undo" button
 
 Arguments:
-    unlabeled_images_directory: Optional path to folder containing unlabeled images
-                              (supports .jp2, .png, .jpg, .jpeg)
-                              If omitted, a directory chooser dialog will open.
+    parent_directory: Optional path to parent folder containing subdirectories.
+                       Each subdirectory should have a 'png_chips' folder with .png images.
+                       If omitted, a directory chooser dialog will open.
 """
 
 import tkinter as tk
 from tkinter import filedialog, messagebox
-import glymur
 from PIL import Image, ImageTk
 import shutil
 import os
@@ -36,12 +39,12 @@ import glob
 
 
 class LabelGUI:
-    def __init__(self, root, unlabeled_dir=None):
+    def __init__(self, root, parent_dir=None):
         self.root = root
         self.root.title("Dock Boat Image Labeler")
         self.root.geometry("600x550")
 
-        self.unlabeled_dir = unlabeled_dir
+        self.parent_dir = parent_dir
         self.image_list = []
         self.current_index = -1
         self.history = []
@@ -61,7 +64,7 @@ class LabelGUI:
                 writer.writerow(["image_path", "label", "split", "is_synthetic"])
 
         self.setup_ui()
-        if self.unlabeled_dir:
+        if self.parent_dir:
             self.load_image_list()
         else:
             self.select_directory()
@@ -73,7 +76,7 @@ class LabelGUI:
         self.progress_label = tk.Label(self.root, text="Progress: 0 / 0 images labeled")
         self.progress_label.pack()
 
-        self.path_label = tk.Label(self.root, text="Current: No directory selected", wraplength=500)
+        self.path_label = tk.Label(self.root, text="Current: No parent directory selected", wraplength=500)
         self.path_label.pack(pady=5)
 
         btn_frame = tk.Frame(self.root)
@@ -86,8 +89,8 @@ class LabelGUI:
         self.undo_btn = tk.Button(self.root, text="Undo (Ctrl+Z)", width=30, command=self.undo_last, state=tk.DISABLED)
         self.undo_btn.pack(pady=5)
 
-        if not self.unlabeled_dir:
-            tk.Button(self.root, text="Select Unlabeled Directory", command=self.select_directory).pack(pady=5)
+        if not self.parent_dir:
+            tk.Button(self.root, text="Select Parent Directory", command=self.select_directory).pack(pady=5)
 
         self.root.bind('1', lambda e: self.label_image(1))
         self.root.bind('2', lambda e: self.label_image(0))
@@ -95,21 +98,30 @@ class LabelGUI:
         self.root.bind('<Control-z>', lambda e: self.undo_last())
 
     def select_directory(self):
-        self.unlabeled_dir = filedialog.askdirectory(title="Select Unlabeled Images Directory")
-        if self.unlabeled_dir:
+        self.parent_dir = filedialog.askdirectory(title="Select Parent Directory")
+        if self.parent_dir:
             self.load_image_list()
         else:
             messagebox.showwarning("No Directory", "No directory selected.")
 
     def load_image_list(self):
-        supported = ('*.jp2', '*.png', '*.jpg', '*.jpeg')
         self.image_list = []
-        for ext in supported:
-            self.image_list.extend(glob.glob(os.path.join(self.unlabeled_dir, ext)))
-            self.image_list.extend(glob.glob(os.path.join(self.unlabeled_dir, ext.upper())))
+        try:
+            subdirs = [d for d in os.listdir(self.parent_dir)
+                       if os.path.isdir(os.path.join(self.parent_dir, d))]
+        except Exception as e:
+            messagebox.showerror("Directory Error", f"Failed to list subdirectories: {e}")
+            return
+
+        for subdir in subdirs:
+            png_chips_dir = os.path.join(self.parent_dir, subdir, "png_chips")
+            if os.path.isdir(png_chips_dir):
+                for ext in ('*.png', '*.PNG'):
+                    self.image_list.extend(glob.glob(os.path.join(png_chips_dir, ext)))
+
         self.image_list = list(set(self.image_list))
         if not self.image_list:
-            messagebox.showinfo("No Images", "No supported images found in directory.")
+            messagebox.showinfo("No Images", "No .png images found in any png_chips subdirectories.")
             return
         self.current_index = 0
         self.show_image()
@@ -123,11 +135,7 @@ class LabelGUI:
         img_path = self.image_list[self.current_index]
         self.path_label.config(text=f"Current: {img_path}")
         try:
-            if img_path.lower().endswith('.jp2'):
-                jp2 = glymur.Jp2k(img_path)
-                img = Image.fromarray(jp2[:])
-            else:
-                img = Image.open(img_path)
+            img = Image.open(img_path)
             img.thumbnail((400, 400))
             self.tk_img = ImageTk.PhotoImage(img)
             self.img_label.config(image=self.tk_img)
@@ -207,6 +215,6 @@ class LabelGUI:
 
 if __name__ == "__main__":
     root = tk.Tk()
-    unlabeled_dir = sys.argv[1] if len(sys.argv) > 1 else None
-    app = LabelGUI(root, unlabeled_dir)
+    parent_dir = sys.argv[1] if len(sys.argv) > 1 else None
+    app = LabelGUI(root, parent_dir)
     root.mainloop()
