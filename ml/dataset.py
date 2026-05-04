@@ -4,7 +4,6 @@ import torch
 from torch.utils.data import Dataset
 from torchvision import transforms
 from PIL import Image
-import glymur
 
 
 class DockDataset(Dataset):
@@ -31,12 +30,7 @@ class DockDataset(Dataset):
         label = int(row['label'])
         is_synthetic = row.get('is_synthetic', False)
 
-        if img_path.endswith('.jp2'):
-            jp2 = glymur.Jp2k(img_path)
-            img_array = jp2[:]
-            img = Image.fromarray(img_array)
-        else:
-            img = Image.open(img_path).convert('RGB')
+        img = Image.open(img_path).convert('RGB')
 
         if self.transform:
             img = self.transform(img)

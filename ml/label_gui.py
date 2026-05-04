@@ -28,21 +28,22 @@ Arguments:
                        If omitted, a directory chooser dialog will open.
 """
 
+import csv
+import glob
+import os
+import shutil
+import sys
 import tkinter as tk
 from tkinter import filedialog, messagebox
+
 from PIL import Image, ImageTk
-import shutil
-import os
-import csv
-import sys
-import glob
 
 
 class LabelGUI:
     def __init__(self, root, parent_dir=None):
         self.root = root
         self.root.title("Dock Boat Image Labeler")
-        self.root.geometry("600x550")
+        self.root.geometry("1200x1000")
 
         self.parent_dir = parent_dir
         self.image_list = []
@@ -59,7 +60,7 @@ class LabelGUI:
         os.makedirs(self.data_dir, exist_ok=True)
 
         if not os.path.exists(self.csv_path):
-            with open(self.csv_path, 'w', newline='') as f:
+            with open(self.csv_path, "w", newline="") as f:
                 writer = csv.writer(f)
                 writer.writerow(["image_path", "label", "split", "is_synthetic"])
 
@@ -70,32 +71,55 @@ class LabelGUI:
             self.select_directory()
 
     def setup_ui(self):
-        self.img_label = tk.Label(self.root)
-        self.img_label.pack(pady=10)
-
         self.progress_label = tk.Label(self.root, text="Progress: 0 / 0 images labeled")
         self.progress_label.pack()
 
-        self.path_label = tk.Label(self.root, text="Current: No parent directory selected", wraplength=500)
+        self.path_label = tk.Label(
+            self.root, text="Current: No parent directory selected", wraplength=1000
+        )
         self.path_label.pack(pady=5)
+
+        self.canvas = tk.Canvas(self.root, bg="black")
+        self.canvas.pack(fill=tk.BOTH, expand=True, pady=10)
+        self.canvas.bind("<Configure>", lambda e: self.display_image())
+
+        self.current_img = None
+        self.tk_img = None
 
         btn_frame = tk.Frame(self.root)
         btn_frame.pack(pady=10)
 
-        tk.Button(btn_frame, text="No Boat (1)", width=15, command=lambda: self.label_image(1)).grid(row=0, column=0, padx=5)
-        tk.Button(btn_frame, text="Boat (2)", width=15, command=lambda: self.label_image(0)).grid(row=0, column=1, padx=5)
-        tk.Button(btn_frame, text="Too Cloudy (3)", width=15, command=lambda: self.label_image(2)).grid(row=0, column=2, padx=5)
+        tk.Button(
+            btn_frame, text="No Boat (1)", width=15, command=lambda: self.label_image(1)
+        ).grid(row=0, column=0, padx=5)
+        tk.Button(
+            btn_frame, text="Boat (2)", width=15, command=lambda: self.label_image(0)
+        ).grid(row=0, column=1, padx=5)
+        tk.Button(
+            btn_frame,
+            text="Too Cloudy (3)",
+            width=15,
+            command=lambda: self.label_image(2),
+        ).grid(row=0, column=2, padx=5)
 
-        self.undo_btn = tk.Button(self.root, text="Undo (Ctrl+Z)", width=30, command=self.undo_last, state=tk.DISABLED)
+        self.undo_btn = tk.Button(
+            self.root,
+            text="Undo (Ctrl+Z)",
+            width=30,
+            command=self.undo_last,
+            state=tk.DISABLED,
+        )
         self.undo_btn.pack(pady=5)
 
         if not self.parent_dir:
-            tk.Button(self.root, text="Select Parent Directory", command=self.select_directory).pack(pady=5)
+            tk.Button(
+                self.root, text="Select Parent Directory", command=self.select_directory
+            ).pack(pady=5)
 
-        self.root.bind('1', lambda e: self.label_image(1))
-        self.root.bind('2', lambda e: self.label_image(0))
-        self.root.bind('3', lambda e: self.label_image(2))
-        self.root.bind('<Control-z>', lambda e: self.undo_last())
+        self.root.bind("1", lambda e: self.label_image(1))
+        self.root.bind("2", lambda e: self.label_image(0))
+        self.root.bind("3", lambda e: self.label_image(2))
+        self.root.bind("<Control-z>", lambda e: self.undo_last())
 
     def select_directory(self):
         self.parent_dir = filedialog.askdirectory(title="Select Parent Directory")
@@ -107,21 +131,28 @@ class LabelGUI:
     def load_image_list(self):
         self.image_list = []
         try:
-            subdirs = [d for d in os.listdir(self.parent_dir)
-                       if os.path.isdir(os.path.join(self.parent_dir, d))]
+            subdirs = [
+                d
+                for d in os.listdir(self.parent_dir)
+                if os.path.isdir(os.path.join(self.parent_dir, d))
+            ]
         except Exception as e:
-            messagebox.showerror("Directory Error", f"Failed to list subdirectories: {e}")
+            messagebox.showerror(
+                "Directory Error", f"Failed to list subdirectories: {e}"
+            )
             return
 
         for subdir in subdirs:
             png_chips_dir = os.path.join(self.parent_dir, subdir, "png_chips")
             if os.path.isdir(png_chips_dir):
-                for ext in ('*.png', '*.PNG'):
+                for ext in ("*.png", "*.PNG"):
                     self.image_list.extend(glob.glob(os.path.join(png_chips_dir, ext)))
 
         self.image_list = list(set(self.image_list))
         if not self.image_list:
-            messagebox.showinfo("No Images", "No .png images found in any png_chips subdirectories.")
+            messagebox.showinfo(
+                "No Images", "No .png images found in any png_chips subdirectories."
+            )
             return
         self.current_index = 0
         self.show_image()
@@ -129,20 +160,42 @@ class LabelGUI:
 
     def show_image(self):
         if self.current_index < 0 or self.current_index >= len(self.image_list):
-            self.img_label.config(image='')
+            self.canvas.delete("all")
             self.path_label.config(text="No more images to label.")
             return
         img_path = self.image_list[self.current_index]
         self.path_label.config(text=f"Current: {img_path}")
         try:
-            img = Image.open(img_path)
-            img.thumbnail((400, 400))
-            self.tk_img = ImageTk.PhotoImage(img)
-            self.img_label.config(image=self.tk_img)
+            self.current_img = Image.open(img_path)
+            self.display_image()
         except Exception as e:
             messagebox.showerror("Image Error", f"Failed to load image: {e}")
             self.current_index += 1
             self.show_image()
+
+    def display_image(self):
+        if self.current_img is None:
+            return
+        canvas_width = self.canvas.winfo_width()
+        canvas_height = self.canvas.winfo_height()
+        if canvas_width <= 1 or canvas_height <= 1:
+            self.root.after(50, self.display_image)
+            return
+        img = self.current_img.copy()
+        img_ratio = img.width / img.height
+        canvas_ratio = canvas_width / canvas_height
+        if img_ratio > canvas_ratio:
+            new_width = canvas_width
+            new_height = int(canvas_width / img_ratio)
+        else:
+            new_height = canvas_height
+            new_width = int(canvas_height * img_ratio)
+        img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+        self.tk_img = ImageTk.PhotoImage(img)
+        self.canvas.delete("all")
+        x = (canvas_width - new_width) // 2
+        y = (canvas_height - new_height) // 2
+        self.canvas.create_image(x, y, anchor=tk.NW, image=self.tk_img)
 
     def label_image(self, label):
         if self.current_index < 0 or self.current_index >= len(self.image_list):
@@ -168,16 +221,14 @@ class LabelGUI:
             messagebox.showerror("Move Error", f"Failed to move file: {e}")
             return
 
-        relative_path = os.path.join("train", class_dir, filename).replace(os.sep, '/')
-        with open(self.csv_path, 'a', newline='') as f:
+        relative_path = os.path.join("train", class_dir, filename).replace(os.sep, "/")
+        with open(self.csv_path, "a", newline="") as f:
             writer = csv.writer(f)
             writer.writerow([relative_path, label, "train", False])
 
-        self.history.append({
-            'moved_path': target_path,
-            'original_path': img_path,
-            'filename': filename
-        })
+        self.history.append(
+            {"moved_path": target_path, "original_path": img_path, "filename": filename}
+        )
         self.undo_btn.config(state=tk.NORMAL)
         self.image_list.pop(self.current_index)
         if self.current_index >= len(self.image_list):
@@ -190,18 +241,18 @@ class LabelGUI:
             return
         last = self.history.pop()
         try:
-            shutil.move(last['moved_path'], last['original_path'])
+            shutil.move(last["moved_path"], last["original_path"])
         except Exception as e:
             messagebox.showerror("Undo Error", f"Failed to undo: {e}")
             return
         try:
-            with open(self.csv_path, 'r') as f:
+            with open(self.csv_path, "r") as f:
                 lines = f.readlines()
-            with open(self.csv_path, 'w') as f:
+            with open(self.csv_path, "w") as f:
                 f.writelines(lines[:-1])
         except Exception as e:
             messagebox.showerror("Undo Error", f"Failed to update CSV: {e}")
-        self.image_list.insert(self.current_index, last['original_path'])
+        self.image_list.insert(self.current_index, last["original_path"])
         if not self.history:
             self.undo_btn.config(state=tk.DISABLED)
         self.show_image()

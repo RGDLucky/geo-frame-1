@@ -7,6 +7,7 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 from torchvision import transforms
 from sklearn.metrics import confusion_matrix, f1_score, classification_report
+from sklearn.model_selection import train_test_split
 import pandas as pd
 from tqdm import tqdm
 from model import DockClassifier
@@ -80,6 +81,18 @@ def main():
     val_dataset = DockDataset(config["data"]["csv_path"], config["data"]["data_dir"], transform=val_transform)
     val_dataset.data = val_dataset.data[val_dataset.data['split'] == 'val']
     train_dataset.data = train_dataset.data[train_dataset.data['split'] == 'train']
+
+    if len(val_dataset.data) == 0:
+        print("No validation data found. Splitting training data 80/20 for train/val...")
+        train_data, val_data = train_test_split(train_dataset.data, test_size=0.2, random_state=42, stratify=train_dataset.data['label'])
+        train_data = train_data.copy()
+        val_data = val_data.copy()
+        train_data['split'] = 'train'
+        val_data['split'] = 'val'
+        train_dataset.data = train_data
+        val_dataset.data = val_data
+        print(f"Train samples: {len(train_data)}, Val samples: {len(val_data)}")
+
     train_loader = DataLoader(train_dataset, batch_size=config["train"]["batch_size"], shuffle=True, num_workers=config["data"]["num_workers"])
     val_loader = DataLoader(val_dataset, batch_size=config["train"]["batch_size"], shuffle=False, num_workers=config["data"]["num_workers"])
 

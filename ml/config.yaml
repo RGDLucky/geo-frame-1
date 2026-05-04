@@ -9,7 +9,7 @@ train:
 
 data:
   csv_path: ./data/dataset.csv
-  data_dir: ./
+  data_dir: ./data
   num_workers: 2
   input_size: [260, 260]
 
