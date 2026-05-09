@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import Optional
 from app.config import settings
@@ -69,7 +69,7 @@ async def get_sync_errors():
 async def get_sync_record(sync_id: str):
     record = await database.get_record(sync_id)
     if not record:
-        return {"error": "record not found"}, 404
+        raise HTTPException(status_code=404, detail="Record not found")
     return record
 
 

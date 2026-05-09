@@ -1,3 +1,4 @@
+import asyncio
 from abc import ABC, abstractmethod
 from typing import Any
 from app.config import settings
@@ -41,7 +42,7 @@ class DockAIProcessor(AIProcessorBase):
                     continue
 
                 png_bytes = convert_tiff_to_png(image_bytes)
-                result = self.model_loader.predict(png_bytes)
+                result = await asyncio.to_thread(self.model_loader.predict, png_bytes)
 
                 predictions.append({
                     "key": image_key,

@@ -1,7 +1,7 @@
 import grpc
 from concurrent import futures
-from app import service_pb2
-from app import service_pb2_grpc
+from app.api import service_pb2
+from app.api import service_pb2_grpc
 from app.config import settings
 from app.clients import get_s3_client
 from app.model import ModelLoader, convert_image_bytes_to_png

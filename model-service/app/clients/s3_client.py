@@ -1,8 +1,10 @@
+import asyncio
 import json
 from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Any, Optional
-import boto3
+import aiobotocore.session
+from botocore.config import Config
 from botocore.exceptions import ClientError
 from app.config import settings
 
@@ -43,29 +45,49 @@ class S3Client(S3ClientBase):
         self.bucket = settings.s3_bucket_name
         self.region = settings.s3_region
         self.prefix = settings.s3_file_prefix
+        self._session = None
         self._client = None
+        self._client_lock = asyncio.Lock()
 
-    @property
-    def client(self):
+    async def _get_client(self):
         if self._client is None:
-            self._client = boto3.client("s3", region_name=self.region)
+            async with self._client_lock:
+                if self._client is None:
+                    config = Config(
+                        connect_timeout=5,
+                        read_timeout=60,
+                        retries={"max_attempts": 3},
+                    )
+                    self._session = aiobotocore.session.get_session()
+                    self._client = self._session.create_client(
+                        "s3",
+                        region_name=self.region,
+                        config=config,
+                    )
         return self._client
+
+    def _extract_date_from_key(self, key: str) -> Optional[str]:
+        parts = key.rstrip("/").split("/")
+        if parts:
+            filename = parts[-1]
+            date_part = filename.replace(".json", "")
+            if len(date_part) == 10 and date_part[4] == "-":
+                return date_part
+        return None
 
     async def find_latest_file(self) -> Optional[str]:
         if not self.bucket or not self.prefix:
             return None
 
-        paginator = self.client.get_paginator("list_objects_v2")
-        operation_input = {
-            "Bucket": self.bucket,
-            "Prefix": self.prefix,
-        }
-
+        client = await self._get_client()
         latest_key = None
         latest_date = None
 
         try:
-            for page in paginator.paginate(**operation_input):
+            paginator = client.get_paginator("list_objects_v2")
+            async for page in paginator.paginate(
+                Bucket=self.bucket, Prefix=self.prefix
+            ):
                 if "Contents" not in page:
                     continue
                 for obj in page["Contents"]:
@@ -84,15 +106,6 @@ class S3Client(S3ClientBase):
 
         return latest_key
 
-    def _extract_date_from_key(self, key: str) -> Optional[str]:
-        parts = key.rstrip("/").split("/")
-        if parts:
-            filename = parts[-1]
-            date_part = filename.replace(".json", "")
-            if len(date_part) == 10 and date_part[4] == "-":
-                return date_part
-        return None
-
     async def fetch(self, file_key: Optional[str] = None) -> dict[str, Any]:
         if not self.bucket:
             raise Exception("S3 bucket not configured")
@@ -102,10 +115,13 @@ class S3Client(S3ClientBase):
             if file_key is None:
                 raise Exception("No file found in S3 bucket")
 
+        client = await self._get_client()
+
         try:
-            response = self.client.get_object(Bucket=self.bucket, Key=file_key)
-            body = response["Body"].read().decode("utf-8")
-            data = json.loads(body)
+            response = await client.get_object(Bucket=self.bucket, Key=file_key)
+            async with response as stream:
+                body = await stream["Body"].read()
+                data = json.loads(body.decode("utf-8"))
         except ClientError as e:
             raise Exception(f"Failed to fetch from S3: {e}") from e
         except json.JSONDecodeError as e:
@@ -114,10 +130,13 @@ class S3Client(S3ClientBase):
         return data
 
     async def download_bytes(self, bucket: str, key: str) -> bytes:
+        client = await self._get_client()
+
         try:
-            response = self.client.get_object(Bucket=bucket, Key=key)
-            body = response["Body"].read()
-            return body
+            response = await client.get_object(Bucket=bucket, Key=key)
+            async with response as stream:
+                body = await stream["Body"].read()
+                return body
         except ClientError as e:
             raise Exception(f"Failed to download from S3: {e}") from e
 

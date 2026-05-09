@@ -1,4 +1,5 @@
 import os
+import threading
 from pathlib import Path
 from typing import Optional
 import torch
@@ -10,13 +11,13 @@ from app.model.dock_classifier import DockClassifier, CLASS_NAMES, IMAGENET_MEAN
 
 class ModelLoader:
     _instance: Optional["ModelLoader"] = None
-    _model: Optional[DockClassifier] = None
-    _device: Optional[torch.device] = None
-    _input_size: tuple[int, int] = (260, 260)
+    _lock = threading.Lock()
 
     def __new__(cls, *args, **kwargs):
         if cls._instance is None:
-            cls._instance = super().__new__(cls)
+            with cls._lock:
+                if cls._instance is None:
+                    cls._instance = super().__new__(cls)
         return cls._instance
 
     def __init__(
@@ -25,7 +26,7 @@ class ModelLoader:
         input_size: tuple[int, int] = (260, 260),
         device: Optional[str] = None,
     ):
-        if self._model is not None:
+        if hasattr(self, "_initialized") and self._initialized:
             return
 
         if model_path is None:
@@ -42,6 +43,8 @@ class ModelLoader:
             else "mps" if device == "mps" and torch.backends.mps.is_available()
             else "cpu"
         )
+        self._model: Optional[DockClassifier] = None
+        self._model_load_lock = threading.Lock()
 
         self._transform = transforms.Compose([
             transforms.Resize(input_size),
@@ -49,18 +52,26 @@ class ModelLoader:
             transforms.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
         ])
 
+        self._initialized = True
+
     def _ensure_model_loaded(self) -> None:
         if self._model is not None:
             return
 
-        if not os.path.exists(self._model_path):
-            raise FileNotFoundError(f"Model not found at {self._model_path}")
+        with self._model_load_lock:
+            if self._model is None:
+                if not os.path.exists(self._model_path):
+                    raise FileNotFoundError(f"Model not found at {self._model_path}")
 
-        self._model = DockClassifier(num_classes=3, pretrained=False)
-        state_dict = torch.load(self._model_path, map_location=self._device, weights_only=True)
-        self._model.load_state_dict(state_dict)
-        self._model.to(self._device)
-        self._model.eval()
+                self._model = DockClassifier(num_classes=3, pretrained=False)
+                state_dict = torch.load(
+                    self._model_path,
+                    map_location=self._device,
+                    weights_only=True
+                )
+                self._model.load_state_dict(state_dict)
+                self._model.to(self._device)
+                self._model.eval()
 
     def predict(self, image_source) -> dict:
         self._ensure_model_loaded()

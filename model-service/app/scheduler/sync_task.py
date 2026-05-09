@@ -1,4 +1,6 @@
 import asyncio
+import logging
+import os
 import uuid
 from datetime import datetime
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -6,6 +8,14 @@ from app.config import settings
 from app.clients import get_s3_client
 from app.processors.ai_processor import get_ai_processor
 from app.storage.database import database
+
+
+log_level = os.getenv("LOG_LEVEL", "INFO").upper()
+logging.basicConfig(
+    level=getattr(logging, log_level, logging.INFO),
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+)
+logger = logging.getLogger(__name__)
 
 
 class SyncScheduler:
@@ -38,9 +48,11 @@ class SyncScheduler:
 
                 self._last_sync_status = "success"
                 self._last_sync_time = datetime.utcnow()
+                logger.info(f"Sync completed successfully: {sync_id}")
                 return {"sync_id": sync_id, "status": "success", "attempts": attempt + 1}
 
             except Exception as e:
+                logger.error(f"Sync attempt {attempt + 1} failed: {e}", exc_info=True)
                 retry_count = await database.increment_retry(sync_id)
                 if retry_count > max_retries:
                     await database.mark_failed(sync_id, str(e))
@@ -58,7 +70,7 @@ class SyncScheduler:
 
     async def run_sync_job(self):
         result = await self.sync_once()
-        print(f"Sync completed: {result}")
+        logger.debug(f"Sync completed: {result}")
 
     def start(self):
         self.scheduler.add_job(

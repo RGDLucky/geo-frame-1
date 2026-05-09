@@ -1,4 +1,5 @@
 import aiosqlite
+import json
 from datetime import datetime
 from typing import Any
 from app.config import settings
@@ -128,7 +129,7 @@ class Database:
                 "SELECT sync_id, raw_data FROM sync_records WHERE status = 'pending'"
             )
             rows = await cursor.fetchall()
-            return [{"sync_id": r[0], "raw_data": eval(r[1])} for r in rows]
+            return [{"sync_id": r[0], "raw_data": json.loads(r[1])} for r in rows]
 
     async def get_record(self, sync_id: str) -> dict[str, Any] | None:
         async with aiosqlite.connect(self.db_path) as db:
@@ -141,8 +142,8 @@ class Database:
             return {
                 "id": row[0],
                 "sync_id": row[1],
-                "raw_data": eval(row[2]),
-                "processed_data": eval(row[3]) if row[3] else None,
+                "raw_data": json.loads(row[2]),
+                "processed_data": json.loads(row[3]) if row[3] else None,
                 "status": row[4],
                 "retry_count": row[5],
                 "created_at": row[6],
@@ -232,7 +233,7 @@ class Database:
                     "image_key": r[2],
                     "class_name": r[3],
                     "confidence": r[4],
-                    "probabilities": eval(r[5]) if r[5] else [],
+                    "probabilities": json.loads(r[5]) if r[5] else [],
                     "processed_at": r[6],
                 }
                 for r in rows
@@ -251,7 +252,7 @@ class Database:
                     "image_key": r[2],
                     "class_name": r[3],
                     "confidence": r[4],
-                    "probabilities": eval(r[5]) if r[5] else [],
+                    "probabilities": json.loads(r[5]) if r[5] else [],
                     "processed_at": r[6],
                 }
                 for r in rows
