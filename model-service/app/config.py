@@ -1,3 +1,4 @@
+from pathlib import Path
 from pydantic_settings import BaseSettings
 
 
@@ -13,16 +14,24 @@ class Settings(BaseSettings):
     sync_max_retries: int = 3
     sync_retry_backoff_seconds: int = 30
 
-    external_api_url: str = ""
-    external_api_key: str = ""
-    ai_model_type: str = ""
-
     s3_bucket_name: str = ""
     s3_region: str = "us-east-1"
     s3_file_prefix: str = ""
 
+    ai_model_type: str = "placeholder"
+
+    model_path: str = ""
+    model_input_size: int = 260
+    model_device: str = "cpu"
+
     class Config:
         env_file = ".env"
+
+    @property
+    def model_path_resolved(self) -> Path:
+        if self.model_path:
+            return Path(self.model_path)
+        return Path(__file__).parent.parent.parent / "ml" / "checkpoints" / "best_model.pth"
 
 
 settings = Settings()

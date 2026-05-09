@@ -5,6 +5,8 @@ package geo_int;
 service ModelService {
   rpc ProcessRequest(Request) returns (Response);
   rpc HealthCheck(Empty) returns (HealthResponse);
+  rpc ProcessImage(ImageProcessRequest) returns (ImageProcessResponse);
+  rpc ClassifyDock(DockClassifyRequest) returns (DockClassifyResponse);
 }
 
 message Empty {}
@@ -23,4 +25,47 @@ message Response {
 
 message HealthResponse {
   string status = 1;
+}
+
+message ImageProcessRequest {
+  string bucket = 1;
+  repeated string image_keys = 2;
+  ProcessOptions options = 3;
+}
+
+message ProcessOptions {
+  int32 target_size = 1;
+  string output_format = 2;
+}
+
+message ImageProcessResponse {
+  repeated ImageResult results = 1;
+  bool success = 2;
+  string error = 3;
+}
+
+message ImageResult {
+  string image_key = 1;
+  string processed_path = 2;
+  bool success = 3;
+  string error = 4;
+}
+
+message DockClassifyRequest {
+  string bucket = 1;
+  repeated string image_keys = 2;
+  bool return_probabilities = 3;
+}
+
+message DockClassifyResponse {
+  repeated DockPrediction predictions = 1;
+  bool success = 2;
+  string error = 3;
+}
+
+message DockPrediction {
+  string image_key = 1;
+  string class_name = 2;
+  float confidence = 3;
+  repeated float probabilities = 4;
 }

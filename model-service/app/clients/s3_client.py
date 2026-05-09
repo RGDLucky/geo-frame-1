@@ -16,6 +16,10 @@ class S3ClientBase(ABC):
     async def find_latest_file(self) -> Optional[str]:
         raise NotImplementedError
 
+    @abstractmethod
+    async def download_bytes(self, bucket: str, key: str) -> bytes:
+        raise NotImplementedError
+
 
 class MockS3Client(S3ClientBase):
     async def fetch(self, file_key: Optional[str] = None) -> dict[str, Any]:
@@ -29,6 +33,9 @@ class MockS3Client(S3ClientBase):
 
     async def find_latest_file(self) -> Optional[str]:
         return "data/mock/latest.json"
+
+    async def download_bytes(self, bucket: str, key: str) -> bytes:
+        return b"mock_image_bytes"
 
 
 class S3Client(S3ClientBase):
@@ -105,6 +112,14 @@ class S3Client(S3ClientBase):
             raise Exception(f"Failed to parse S3 JSON: {e}") from e
 
         return data
+
+    async def download_bytes(self, bucket: str, key: str) -> bytes:
+        try:
+            response = self.client.get_object(Bucket=bucket, Key=key)
+            body = response["Body"].read()
+            return body
+        except ClientError as e:
+            raise Exception(f"Failed to download from S3: {e}") from e
 
 
 def get_s3_client() -> S3ClientBase:

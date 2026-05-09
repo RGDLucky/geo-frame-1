@@ -3,7 +3,7 @@
 import grpc
 import warnings
 
-from app.api import service_pb2 as proto_dot_service__pb2
+from proto import service_pb2 as proto_dot_service__pb2
 
 GRPC_GENERATED_VERSION = '1.80.0'
 GRPC_VERSION = grpc.__version__

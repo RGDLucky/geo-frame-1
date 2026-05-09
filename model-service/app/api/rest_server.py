@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
+from typing import Optional
 from app.config import settings
 from app.scheduler.sync_task import sync_scheduler
 from app.storage.database import database
@@ -19,6 +20,21 @@ class HealthResponse(BaseModel):
     status: str
     last_sync_status: str | None
     last_sync_time: str | None
+
+
+class PredictionResponse(BaseModel):
+    id: int
+    sync_id: str
+    image_key: str
+    class_name: str
+    confidence: float
+    probabilities: list[float]
+    processed_at: str
+
+
+class PredictionsListResponse(BaseModel):
+    predictions: list[PredictionResponse]
+    count: int
 
 
 @app.get("/health", response_model=HealthResponse)
@@ -55,6 +71,24 @@ async def get_sync_record(sync_id: str):
     if not record:
         return {"error": "record not found"}, 404
     return record
+
+
+@app.get("/predictions", response_model=PredictionsListResponse)
+async def get_predictions(limit: int = 100):
+    predictions = await database.get_recent_predictions(limit=limit)
+    return PredictionsListResponse(
+        predictions=[PredictionResponse(**p) for p in predictions],
+        count=len(predictions),
+    )
+
+
+@app.get("/predictions/{sync_id}", response_model=PredictionsListResponse)
+async def get_predictions_for_sync(sync_id: str):
+    predictions = await database.get_predictions(sync_id)
+    return PredictionsListResponse(
+        predictions=[PredictionResponse(**p) for p in predictions],
+        count=len(predictions),
+    )
 
 
 def serve():

@@ -39,6 +39,18 @@ class Database:
                     updated_at TEXT NOT NULL
                 )
             """)
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS ai_predictions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    sync_id TEXT NOT NULL,
+                    image_key TEXT,
+                    class_name TEXT,
+                    confidence REAL,
+                    probabilities TEXT,
+                    processed_at TEXT NOT NULL,
+                    FOREIGN KEY (sync_id) REFERENCES sync_records(sync_id)
+                )
+            """)
             await db.commit()
 
     async def store_raw(self, sync_id: str, data: dict[str, Any]) -> int:
@@ -170,6 +182,80 @@ class Database:
             )
             row = await cursor.fetchone()
             return row[0] if row else None
+
+    async def store_prediction(
+        self,
+        sync_id: str,
+        image_key: str,
+        class_name: str,
+        confidence: float,
+        probabilities: list[float],
+    ) -> int:
+        async with aiosqlite.connect(self.db_path) as db:
+            now = datetime.utcnow().isoformat()
+            await db.execute(
+                """
+                INSERT INTO ai_predictions
+                (sync_id, image_key, class_name, confidence, probabilities, processed_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (sync_id, image_key, class_name, confidence, str(probabilities), now),
+            )
+            await db.commit()
+            cursor = await db.execute("SELECT last_insert_rowid()")
+            row = await cursor.fetchone()
+            return row[0] if row else None
+
+    async def store_predictions_batch(
+        self, sync_id: str, predictions: list[dict[str, Any]]
+    ) -> None:
+        for pred in predictions:
+            if pred.get("success"):
+                await self.store_prediction(
+                    sync_id=sync_id,
+                    image_key=pred.get("key", "unknown"),
+                    class_name=pred.get("class_name", ""),
+                    confidence=pred.get("confidence", 0.0),
+                    probabilities=pred.get("probabilities", []),
+                )
+
+    async def get_predictions(self, sync_id: str) -> list[dict[str, Any]]:
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.execute(
+                "SELECT * FROM ai_predictions WHERE sync_id = ? ORDER BY id", (sync_id,)
+            )
+            rows = await cursor.fetchall()
+            return [
+                {
+                    "id": r[0],
+                    "sync_id": r[1],
+                    "image_key": r[2],
+                    "class_name": r[3],
+                    "confidence": r[4],
+                    "probabilities": eval(r[5]) if r[5] else [],
+                    "processed_at": r[6],
+                }
+                for r in rows
+            ]
+
+    async def get_recent_predictions(self, limit: int = 100) -> list[dict[str, Any]]:
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.execute(
+                "SELECT * FROM ai_predictions ORDER BY id DESC LIMIT ?", (limit,)
+            )
+            rows = await cursor.fetchall()
+            return [
+                {
+                    "id": r[0],
+                    "sync_id": r[1],
+                    "image_key": r[2],
+                    "class_name": r[3],
+                    "confidence": r[4],
+                    "probabilities": eval(r[5]) if r[5] else [],
+                    "processed_at": r[6],
+                }
+                for r in rows
+            ]
 
 
 database = Database()
