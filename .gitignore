@@ -230,6 +230,9 @@ demo/s3_temp/
 # ML
 ml/data/
 
+# npm
+.npmrc
+
 # Demo
 demo/myenv/
 demo/s3_temp/
