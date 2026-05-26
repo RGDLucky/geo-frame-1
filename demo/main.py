@@ -113,7 +113,7 @@ def main():
     # Process past 2 years (730 days)
     end_date = date.today()
     # start_date = end_date - timedelta(days=730)
-    start_date = end_date - timedelta(days=30)
+    start_date = end_date - timedelta(days=365)
 
     print(f"Processing data from {start_date} to {end_date} (past 2 years)")
 
